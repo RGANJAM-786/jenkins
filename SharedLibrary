@@ -1,31 +1,63 @@
-@Library('my-shared-library') _
-pipeline {
+@Library("my-shared-library") _
+pipeline
+{
     agent any
-
-    tools {
+    tools
+    {
         maven "maven-3.9.9"
     }
-
-    stages {
-        stage('git checkout') {
-            steps {
-                slack('STARTED') // notify when pipeline starts
+    stages
+    {
+        stage('git checkout')
+        {
+            steps
+            {
+                notifyBuild('start')
                 git branch: 'prod', url: 'https://github.com/RGANJAM-786/maven-webapplication-project-kkfunda.git'
             }
         }
-        stage('build') {
-            steps {
+        stage('Build')
+        {
+            steps
+            {
                 mavenBuild()
             }
         }
-    }
-
-    post {
-        success {
-            slack('SUCCESS')
+        stage('Code Quality')
+        {
+            steps
+            {
+                sh "mvn sonar:sonar"
+            }
         }
-        failure {
-            slack('FAILURE')
+        stage('Deploy')
+        {
+            steps
+            {
+                parallel(
+                    "Deploy to Nexus" : {
+                        sh "mvn clean deploy"
+                    },
+                    "deploy to tomcat" : {
+                        sh """
+            curl -u rakesh:password \\
+            --upload-file target/maven-web-application.war \\
+            "http://34.201.247.138:8080/manager/text/deploy?path=/maven-web-application&update=true"
+        """
+                    }
+                    )
+            }
+        }
+    }
+    post 
+    {
+        success 
+        {
+            notifyBuild('success')
+        }
+        failure
+        {
+            notifyBuild('failure')
         }
     }
 }
