@@ -1,0 +1,31 @@
+@Library('my-shared-library') _
+pipeline {
+    agent any
+
+    tools {
+        maven "maven-3.9.9"
+    }
+
+    stages {
+        stage('git checkout') {
+            steps {
+                slack('STARTED') // notify when pipeline starts
+                git branch: 'prod', url: 'https://github.com/RGANJAM-786/maven-webapplication-project-kkfunda.git'
+            }
+        }
+        stage('build') {
+            steps {
+                mavenBuild()
+            }
+        }
+    }
+
+    post {
+        success {
+            slack('SUCCESS')
+        }
+        failure {
+            slack('FAILURE')
+        }
+    }
+}
