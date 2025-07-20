@@ -1,0 +1,43 @@
+@Library("my-shared-library") _
+node {
+    def mavenHome = tool name: "maven-3.9.9"
+
+    try {
+        stage('Git checkout') {
+            notifyBuild('start')
+            git branch: 'prod', url: 'https://github.com/RGANJAM-786/maven-webapplication-project-kkfunda.git'
+        }
+
+        stage('Build and code quality') {
+            parallel(
+                "Build": {
+                    sh "${mavenHome}/bin/mvn clean package"
+                },
+                "Code Quality": {
+                    sh "${mavenHome}/bin/mvn sonar:sonar"
+                }
+            )
+        }
+
+        stage('Deploy') {
+            parallel(
+                "Deploy to Nexus": {
+                    sh "${mavenHome}/bin/mvn clean deploy"
+                },
+                "Deploy to Tomcat": {
+                    sh """
+                        curl -u rakesh:password \\
+                        --upload-file target/maven-web-application.war \\
+                        "http://34.201.247.138:8080/manager/text/deploy?path=/maven-web-application&update=true"
+                    """
+                }
+            )
+        }
+
+        notifyBuild('success') // ✅ If everything above succeeds
+
+    } catch (e) {
+        notifyBuild('failure') // ❌ If any stage fails
+        throw e // Let Jenkins mark the build as failed
+    }
+}
